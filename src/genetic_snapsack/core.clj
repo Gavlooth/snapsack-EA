@@ -2,10 +2,10 @@
   (:gen-class))
 
 
-(def  data {:ratings [2 9 3 8 10 6 4 10]
-            :weights [1 2 4 3 3 1 5 10]  
-            :restriction 15
-            :population-number 1000
+(def  data {:ratings [2 9 3 8 10 6 4 10 2 3 4 5 1]
+            :weights [1 2 4 3 3 1 5 10 3 3 1 9 4]
+            :restriction 25
+            :population-number 30
             :mutation-rate 0.1
             :max-generations 1000})
 
@@ -30,6 +30,7 @@
    (fn [chromosome]
      (mapv rnd-bit-flip chromosome))))
 
+
 (defn initialize-population [gene-count population-number]
  (let [rand-01 (partial rand-int 2)]
   (repeatedly population-number #(vec  (repeatedly gene-count rand-01)))))
@@ -40,32 +41,39 @@
                       population-number
                       mutation-rate
                       max-generations]}]
-  (let [state (atom 0)
-        gene-count  (count ratings)
+  (let [gene-count  (count ratings)
         fitness    (build-snapsack-fitness ratings weights restriction)
-        mutagent   (create-mutation-operator mutation-rate)
+        mutate   (create-mutation-operator mutation-rate)
         cross   (build-crossover-operator gene-count)
         initial-population   (initialize-population gene-count population-number)]
-    (loop [population initial-population generation 0 idle-generation-count 0]
+    (loop [population initial-population generation 0 idle-generation-count 0 most-fit {:chromosome [] :fitness -1 :generation 0}]
       (let [mating-pool  (partition 2 (shuffle population))
             next-generation  (->>  mating-pool
                               (map cross)
                               (concat population)
-                              (map  mutagent)
+                              (map  mutate)
                               (sort-by fitness >)
                               (take population-number))
-            next-idle-generation-count (if (= (fitness (first population))
-                                              (fitness (first nex-generation))
-                                              (inc idle-generation-count) 0))
-            generations-passed (inc generation)]
+            max-current-fitness   (fitness (first next-generation))
+            generations-passed (inc generation)
+            should-update-fit? (<  (:fitness most-fit) max-current-fitness)
+            next-most-fit      (if should-update-fit?
+                                 {:chromosome (first next-generation)
+                                  :fitness max-current-fitness
+                                  :generation generations-passed}
+                                 most-fit)
+
+            next-idle-generation-count (if-not should-update-fit?
+                                           (inc idle-generation-count) 0)]
+        (println "generation: " generations-passed ", fitness score: " (:fitness most-fit))
         (if (and (<= generation max-generations) (<= idle-generation-count 20))
-            (recur next-generation  generations-passed next-idle-generation-count)
-            next-generation)))))
-             
-        
+            (recur next-generation  generations-passed next-idle-generation-count next-most-fit)
+            most-fit)))))
+
 
 (defn -main
   "I don't do a whole lot ... yet."
   [& args]
   (println "Hello, World!"))
+
 
